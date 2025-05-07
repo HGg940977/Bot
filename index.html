@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>March for Palestine - Telegram Game</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            touch-action: manipulation;
+        }
+        body {
+            width: 100%;
+            height: 100vh;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            background: #000;
+            color: white;
+        }
+        #game-container {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        canvas {
+            display: block;
+            background: #222;
+            border-radius: 10px;
+            max-width: 100%;
+            max-height: 70vh;
+        }
+        #score-display {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        #controls {
+            margin-top: 20px;
+            text-align: center;
+        }
+        button {
+            background: #0088cc;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            font-size: 16px;
+            margin: 5px;
+            cursor: pointer;
+        }
+        #game-over {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            display: none;
+        }
+        #start-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 10;
+        }
+        h1 {
+            color: #0088cc;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .instructions {
+            margin: 20px;
+            text-align: center;
+            max-width: 80%;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div id="start-screen">
+            <h1>March for Palestine</h1>
+            <p class="instructions">Avoid obstacles and march for freedom!</p>
+            <button id="start-btn">Start Game</button>
+            <p class="instructions" style="margin-top: 20px;">Tap or press SPACE to jump</p>
+        </div>
+        <canvas id="game-canvas" width="300" height="500"></canvas>
+        <div id="score-display">Score: 0</div>
+        <div id="game-over">
+            <h2>Game Over!</h2>
+            <p id="final-score">Score: 0</p>
+            <button id="restart-btn">Play Again</button>
+        </div>
+    </div>
+
+    <script>
+        // Telegram WebApp initialization
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        tg.enableClosingConfirmation();
+        
+        // Game variables
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+        const startScreen = document.getElementById('start-screen');
+        const startBtn = document.getElementById('start-btn');
+        const scoreDisplay = document.getElementById('score-display');
+        const gameOverScreen = document.getElementById('game-over');
+        const finalScoreDisplay = document.getElementById('final-score');
+        const restartBtn = document.getElementById('restart-btn');
+        
+        // Game state
+        let gameRunning = false;
+        let score = 0;
+        let highScore = 0;
+        let animationId;
+        
+        // Player
+        const player = {
+            x: 50,
+            y: canvas.height / 2,
+            width: 30,
+            height: 30,
+            speed: 5,
+            gravity: 0.5,
+            jumpForce: -10,
+            velocity: 0,
+            jumping: false
+        };
+        
+        // Obstacles
+        let obstacles = [];
+        let obstacleSpeed = 2;
+        let obstacleFrequency = 2000;
+        let lastObstacleTime = 0;
+        
+        // Game images
+        const playerImg = new Image();
+        playerImg.src = 'https://i.postimg.cc/90BpVLnt/char2.png';
+        
+        const obstacleImg = new Image();
+        obstacleImg.src = 'https://i.postimg.cc/vBHkp6BK/fire.png';
+        
+        // Initialize game
+        function initGame() {
+            player.y = canvas.height / 2;
+            player.velocity = 0;
+            obstacles = [];
+            score = 0;
+            scoreDisplay.textContent = `Score: ${score}`;
+            obstacleSpeed = 2;
+            obstacleFrequency = 2000;
+            lastObstacleTime = 0;
+        }
+        
+        // Start game
+        function startGame() {
+            initGame();
+            gameRunning = true;
+            startScreen.style.display = 'none';
+            gameOverScreen.style.display = 'none';
+            gameLoop();
+            
+            // Send start notification to Telegram
+            if (tg.initDataUnsafe.user) {
+                const userId = tg.initDataUnsafe.user.id;
+                fetch(`https://api.telegram.org/bot7795094888:AAGH0DrdY85bAH5NbSNdlgFr8qdDEMhafmw/sendMessage`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        chat_id: userId,
+                        text: '🚀 Game started! March for Palestine!'
+                    })
+                });
+            }
+        }
+        
+        // Game over
+        function gameOver() {
+            gameRunning = false;
+            cancelAnimationFrame(animationId);
+            finalScoreDisplay.textContent = `Score: ${score}`;
+            gameOverScreen.style.display = 'block';
+            
+            // Send score to Telegram
+            if (tg.initDataUnsafe.user) {
+                const userId = tg.initDataUnsafe.user.id;
+                fetch(`https://api.telegram.org/bot7795094888:AAGH0DrdY85bAH5NbSNdlgFr8qdDEMhafmw/sendMessage`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        chat_id: userId,
+                        text: `🎮 Game Over! Your score: ${score}`
+                    })
+                });
+            }
+        }
+        
+        // Jump function
+        function jump() {
+            if (!player.jumping) {
+                player.velocity = player.jumpForce;
+                player.jumping = true;
+            }
+        }
+        
+        // Create new obstacle
+        function createObstacle() {
+            const height = Math.random() * 100 + 50;
+            obstacles.push({
+                x: canvas.width,
+                y: canvas.height - height,
+                width: 30,
+                height: height,
+                passed: false
+            });
+        }
+        
+        // Update game state
+        function update() {
+            // Update player
+            player.velocity += player.gravity;
+            player.y += player.velocity;
+            
+            // Check if player hits the ground
+            if (player.y > canvas.height - player.height) {
+                player.y = canvas.height - player.height;
+                player.velocity = 0;
+                player.jumping = false;
+            }
+            
+            // Check if player hits the ceiling
+            if (player.y < 0) {
+                player.y = 0;
+                player.velocity = 0;
+            }
+            
+            // Create new obstacles
+            const now = Date.now();
+            if (now - lastObstacleTime > obstacleFrequency) {
+                createObstacle();
+                lastObstacleTime = now;
+                
+                // Increase difficulty
+                if (score % 5 === 0) {
+                    obstacleSpeed += 0.2;
+                    obstacleFrequency = Math.max(800, obstacleFrequency - 50);
+                }
+            }
+            
+            // Update obstacles
+            for (let i = obstacles.length - 1; i >= 0; i--) {
+                obstacles[i].x -= obstacleSpeed;
+                
+                // Check collision
+                if (
+                    player.x < obstacles[i].x + obstacles[i].width &&
+                    player.x + player.width > obstacles[i].x &&
+                    player.y < obstacles[i].y + obstacles[i].height &&
+                    player.y + player.height > obstacles[i].y
+                ) {
+                    gameOver();
+                    return;
+                }
+                
+                // Check if player passed obstacle
+                if (!obstacles[i].passed && player.x > obstacles[i].x + obstacles[i].width) {
+                    obstacles[i].passed = true;
+                    score++;
+                    scoreDisplay.textContent = `Score: ${score}`;
+                }
+                
+                // Remove off-screen obstacles
+                if (obstacles[i].x + obstacles[i].width < 0) {
+                    obstacles.splice(i, 1);
+                }
+            }
+        }
+        
+        // Render game
+        function render() {
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw player
+            ctx.drawImage(playerImg, player.x, player.y, player.width, player.height);
+            
+            // Draw obstacles
+            for (const obstacle of obstacles) {
+                ctx.drawImage(
+                    obstacleImg, 
+                    obstacle.x, 
+                    obstacle.y, 
+                    obstacle.width, 
+                    obstacle.height
+                );
+            }
+        }
+        
+        // Main game loop
+        function gameLoop() {
+            if (!gameRunning) return;
+            
+            update();
+            render();
+            
+            animationId = requestAnimationFrame(gameLoop);
+        }
+        
+        // Event listeners
+        startBtn.addEventListener('click', startGame);
+        restartBtn.addEventListener('click', startGame);
+        
+        // Keyboard controls
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                jump();
+            }
+        });
+        
+        // Touch controls
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            jump();
+        });
+        
+        // Mouse controls
+        canvas.addEventListener('mousedown', jump);
+        
+        // Telegram back button handler
+        tg.BackButton.onClick(() => {
+            tg.close();
+        });
+        
+        // Show back button when game starts
+        startBtn.addEventListener('click', () => {
+            tg.BackButton.show();
+        });
+    </script>
+</body>
+</html>
