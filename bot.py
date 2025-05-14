@@ -2,13 +2,13 @@ import os
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from telegram.ext import Updater, CommandHandler, CallbackContext
 
-BOT_TOKEN = os.environ.get("BOT_TOKEN")
+BOT_TOKEN = os.environ.get("")
 
 def start(update: Update, context: CallbackContext):
     keyboard = [[
         InlineKeyboardButton(
             "🎮 Play Game", 
-            web_app=WebAppInfo(url="https://yourusername.neocities.org")
+            web_app=WebAppInfo(url="https://hgg940977.github.io/Palatinate-/")
         )
     ]]
     reply_markup = InlineKeyboardMarkup(keyboard)
