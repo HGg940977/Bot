@@ -8,7 +8,7 @@ OPENROUTER_API_KEY = "sk-or-v1-7358d1d2075fcb67b81ef943cd75621da8ba7ff5dc881d664
 MODEL = "qwen/qwq-32b:free"  # বা অন্য যেকোনো মডেল
 
 # 🤖 Telegram Bot Token
-TELEGRAM_TOKEN = "YOUR_TELEGRAM_BOT_TOKEN"
+TELEGRAM_TOKEN = "7681539419:AAFzrTrwWW9Zqf11Am_NWXJqwueewR8a16Y"
 
 logging.basicConfig(level=logging.INFO)
 
